@@ -7,9 +7,10 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
+        // HTTPS clone using Jenkins Username+PAT credential (github-token)
         git branch: 'main',
             credentialsId: 'github-token',
-            url: 'https://github.com/kanishkdwivedi/mita-ci-cd-java.git'
+            url: 'https://github.com/kanishkdw/mita-ci-cd-java.git'
       }
     }
     stage('Build') {
