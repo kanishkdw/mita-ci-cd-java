@@ -164,21 +164,16 @@ pipeline {
   }
   steps {
     // bind secret text credential to variable SONAR_TOKEN
-    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-      sh label: 'Run Sonar', script: '''
-        set -e
-        cd repo
-        # use environment SONAR_HOST_URL set in Jenkins (or hardcode here)
-        if command -v mvn >/dev/null 2>&1; then
-          # use -Dsonar.login=$SONAR_TOKEN (no groovy interpolation)
-          mvn -B sonar:sonar -Dsonar.projectKey=mita-ci-cd-java -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=$SONAR_TOKEN
-        else
-          echo "Maven not available - skipping Sonar."
-        fi
-      '''
-    }
-  }
+withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+  sh '''
+    cd repo
+    mvn -B sonar:sonar \
+      -Dsonar.projectKey=mita-ci-cd-java \
+      -Dsonar.host.url=http://sonarqube:9000 \
+      -Dsonar.login=$SONAR_TOKEN
+  '''
 }
+
 
     // Add more stages (docker build/push, deploy) here as needed
   } // stages
