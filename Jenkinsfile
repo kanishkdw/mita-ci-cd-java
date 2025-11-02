@@ -3,13 +3,13 @@ pipeline {
   agent any
 
   environment {
-    REPO_SSH      = 'git@github.com:kanishkdw/mita-ci-cd-java.git'
-    SSH_KEY_PATH  = '/var/jenkins_home/.ssh/id_ed25519'
-    KNOWN_HOSTS   = '/var/jenkins_home/.ssh/known_hosts'
-    CLONE_DIR     = 'repo'
-    SONAR_HOST_URL = 'http://sonarqube:9000'
+    REPO_SSH        = 'git@github.com:kanishkdw/mita-ci-cd-java.git'
+    SSH_KEY_PATH    = '/var/jenkins_home/.ssh/id_ed25519'
+    KNOWN_HOSTS     = '/var/jenkins_home/.ssh/known_hosts'
+    CLONE_DIR       = 'repo'
+    SONAR_HOST_URL  = 'http://sonarqube:9000'
     DOCKER_REGISTRY = 'docker.io'
-    IMAGE_NAME    = 'kanishkdw/mita-ci-cd-java'
+    IMAGE_NAME      = 'kanishkdw/mita-ci-cd-java'
   }
 
   options {
@@ -163,9 +163,8 @@ pipeline {
         expression { env.PROJECT_TYPE == 'maven' }
       }
       steps {
-        // Use withCredentials so the token is not interpolated as a Groovy secret
+        // use withCredentials to keep token out of Groovy logs
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-          // triple-single-quoted string prevents Groovy interpolation (keeps secret out of Groovy logs)
           sh '''
             cd "${CLONE_DIR}"
             if ! command -v mvn >/dev/null 2>&1; then
@@ -181,7 +180,27 @@ pipeline {
       }
     }
 
-    // add more stages here (docker build/push, deploy) if required
+    stage('Deploy') {
+      when {
+        expression { env.PROJECT_TYPE == 'maven' }
+      }
+      steps {
+        echo "Deploying MITA App..."
+        sh '''
+          cd "${CLONE_DIR}/target"
+          JAR_FILE=$(ls *.jar | head -n 1 || true)
+          if [ -z "$JAR_FILE" ]; then
+            echo "No jar found to deploy"
+            exit 1
+          fi
+          echo "Running $JAR_FILE ..."
+          nohup java -jar "$JAR_FILE" > app.log 2>&1 &
+          sleep 5
+          echo "App deployed and running in background (app.log)."
+        '''
+      }
+    }
+    // add more stages here (docker build/push, integration tests, deploy to k8s, etc.)
   } // end stages
 
   post {
