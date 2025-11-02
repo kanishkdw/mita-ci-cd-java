@@ -278,3 +278,17 @@ stage('Debug env') {
     sh 'env | sort | grep -E "DOCKER|SONAR|IMAGE|BUILD_NUMBER" || true'
   }
 }
+pipeline {
+  agent any
+
+  environment {
+    SONAR_HOST_URL = 'http://sonarqube:9000'   // ✅ Sonar container name (same Docker network)
+    DOCKER_REGISTRY = 'docker.io'
+    IMAGE_NAME = 'kanishkdw/mita-ci-cd-java'
+  }
+
+  stages {
+    ...
+  }
+}
+
