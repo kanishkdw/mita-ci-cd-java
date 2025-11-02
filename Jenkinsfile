@@ -273,3 +273,8 @@ pipeline {
     }
   }
 }
+stage('Debug env') {
+  steps {
+    sh 'env | sort | grep -E "DOCKER|SONAR|IMAGE|BUILD_NUMBER" || true'
+  }
+}
