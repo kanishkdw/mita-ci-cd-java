@@ -7,7 +7,7 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        git branch: 'main', credentialsId: 'jenkins-git-ssh', url: "${env.REPO_URL ?: 'git@github.com:kanishkdwi/mita-ci-cd-java.git'}"
+        git branch: 'main', credentialsId: 'jenkins-git-ssh', url: "${env.REPO_URL ?: 'git@github.com:kanishkdw/mita-ci-cd-java.git'}"
       }
     }
 
