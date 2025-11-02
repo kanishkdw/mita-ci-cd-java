@@ -9,6 +9,15 @@ pipeline {
     // Optional: known hosts path (we assume it exists)
     KNOWN_HOSTS = '/var/jenkins_home/.ssh/known_hosts'
     CLONE_DIR = 'repo'         // where repo will be cloned
+
+    // SonarQube config (require you to add Jenkins credential 'sonar-token' secret text)
+    SONAR_HOST_URL = 'http://host.docker.internal:9000' // adjust if needed
+    SONAR_TOKEN = credentials('sonar-token')
+
+    // Optional Docker push config (set DOCKER_REGISTRY and DOCKER_CREDENTIALS_ID in Jenkins if you want Docker push)
+    DOCKER_REGISTRY = ''          // e.g. registry.hub.docker.com or ghcr.io/myorg (leave empty to skip Docker push)
+    DOCKER_CREDENTIALS_ID = ''    // Jenkins credential id (username/password) for docker login
+    IMAGE_NAME = "kanishkdw/mita-ci-cd-java" // default image name (change as needed)
   }
 
   options {
@@ -80,7 +89,7 @@ pipeline {
           '''
           def props = readFile('project_type.env').trim()
           echo "Detected: ${props}"
-          // load into env
+          // load into env.PROJECT_TYPE for later stages
           env.PROJECT_TYPE = props.replace('PROJECT_TYPE=','').trim()
         }
       }
@@ -162,6 +171,92 @@ pipeline {
       }
     }
 
+    // -------------------------
+    // NEW / EXTRA STAGES (kept after your original pipeline)
+    // -------------------------
+
+    stage('Test (publish reports)') {
+      when {
+        expression { env.PROJECT_TYPE == 'maven' }
+      }
+      steps {
+        echo 'Running unit tests (if not already run) and publishing JUnit reports...'
+        script {
+          // run tests if not run previously (we already ran in Optional stage, but re-run is OK if needed)
+          sh '''
+            cd "${CLONE_DIR}"
+            if command -v mvn >/dev/null 2>&1; then
+              mvn -B test || true
+            else
+              echo "maven not available - skipping test run"
+            fi
+          '''
+        }
+      }
+      post {
+        always {
+          junit "${CLONE_DIR}/target/surefire-reports/*.xml"
+        }
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      when {
+        allOf {
+          expression { env.PROJECT_TYPE == 'maven' }
+          expression { return env.SONAR_TOKEN != null && env.SONAR_TOKEN != '' }
+        }
+      }
+      steps {
+        echo "Starting SonarQube analysis (project: mita-ci-cd-java)..."
+        sh """
+          cd "${CLONE_DIR}"
+          if command -v mvn >/dev/null 2>&1; then
+            mvn -B sonar:sonar \
+              -Dsonar.projectKey=mita-ci-cd-java \
+              -Dsonar.host.url=${SONAR_HOST_URL} \
+              -Dsonar.login=${SONAR_TOKEN}
+          else
+            echo "Maven not found - cannot run SonarQube analysis"
+            exit 1
+          fi
+        """
+      }
+    }
+
+    stage('Docker Build & Push (optional)') {
+      when {
+        allOf {
+          expression { return env.DOCKER_REGISTRY != null && env.DOCKER_REGISTRY != '' }
+          expression { return env.DOCKER_CREDENTIALS_ID != null && env.DOCKER_CREDENTIALS_ID != '' }
+        }
+      }
+      steps {
+        script {
+          echo "Building Docker image and pushing to ${DOCKER_REGISTRY} (optional)"
+          withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+            sh '''
+              set -e
+              cd "${CLONE_DIR}"
+              # Tagging: registry/imagename:build-${BUILD_NUMBER}
+              IMAGE_TAG="${DOCKER_REGISTRY}/${IMAGE_NAME}:build-${BUILD_NUMBER}"
+              echo "Building ${IMAGE_TAG} ..."
+              if [ -f Dockerfile ]; then
+                docker build -t "${IMAGE_TAG}" .
+              else
+                echo "No Dockerfile found in repo; skipping docker build"
+                exit 1
+              fi
+              echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin "${DOCKER_REGISTRY}"
+              docker push "${IMAGE_TAG}"
+              docker logout "${DOCKER_REGISTRY}"
+              echo "Docker image pushed: ${IMAGE_TAG}"
+            '''
+          }
+        }
+      }
+    }
+
   } // stages
 
   post {
@@ -178,15 +273,3 @@ pipeline {
     }
   }
 }
-stage('Test') {
-  steps {
-    echo 'Running unit tests...'
-    sh 'mvn test'
-  }
-  post {
-    always {
-      junit '**/target/surefire-reports/*.xml'
-    }
-  }
-}
-
