@@ -1,15 +1,15 @@
-// Jenkinsfile - manual SSH clone + flexible build (cleaned)
+// Jenkinsfile - manual SSH clone + flexible build (corrected)
 pipeline {
   agent any
 
   environment {
-    REPO_SSH = 'git@github.com:kanishkdw/mita-ci-cd-java.git'
-    SSH_KEY_PATH = '/var/jenkins_home/.ssh/id_ed25519'
-    KNOWN_HOSTS = '/var/jenkins_home/.ssh/known_hosts'
-    CLONE_DIR = 'repo'
-    SONAR_HOST_URL = 'http://sonarqube:9000'  // adjust if needed
+    REPO_SSH      = 'git@github.com:kanishkdw/mita-ci-cd-java.git'
+    SSH_KEY_PATH  = '/var/jenkins_home/.ssh/id_ed25519'
+    KNOWN_HOSTS   = '/var/jenkins_home/.ssh/known_hosts'
+    CLONE_DIR     = 'repo'
+    SONAR_HOST_URL = 'http://sonarqube:9000'
     DOCKER_REGISTRY = 'docker.io'
-    IMAGE_NAME = 'kanishkdw/mita-ci-cd-java'
+    IMAGE_NAME    = 'kanishkdw/mita-ci-cd-java'
   }
 
   options {
@@ -159,24 +159,30 @@ pipeline {
     }
 
     stage('SonarQube Analysis') {
-  when {
-    expression { env.PROJECT_TYPE == 'maven' }
-  }
-  steps {
-    // bind secret text credential to variable SONAR_TOKEN
-withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-  sh '''
-    cd repo
-    mvn -B sonar:sonar \
-      -Dsonar.projectKey=mita-ci-cd-java \
-      -Dsonar.host.url=http://sonarqube:9000 \
-      -Dsonar.login=$SONAR_TOKEN
-  '''
-}
+      when {
+        expression { env.PROJECT_TYPE == 'maven' }
+      }
+      steps {
+        // Use withCredentials so the token is not interpolated as a Groovy secret
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          // triple-single-quoted string prevents Groovy interpolation (keeps secret out of Groovy logs)
+          sh '''
+            cd "${CLONE_DIR}"
+            if ! command -v mvn >/dev/null 2>&1; then
+              echo "Maven not found - cannot run Sonar analysis"
+              exit 1
+            fi
+            mvn -B sonar:sonar \
+              -Dsonar.projectKey=mita-ci-cd-java \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.login=$SONAR_TOKEN
+          '''
+        }
+      }
+    }
 
-
-    // Add more stages (docker build/push, deploy) here as needed
-  } // stages
+    // add more stages here (docker build/push, deploy) if required
+  } // end stages
 
   post {
     success {
