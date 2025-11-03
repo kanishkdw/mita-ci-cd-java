@@ -22,6 +22,7 @@
   </properties>
 
   <dependencies>
+    <!-- existing dependencies (kept as-is) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -32,6 +33,35 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- NEW: Spring Boot Actuator (exposes /actuator endpoints incl. prometheus when configured) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- NEW: Micrometer Prometheus registry for metrics scraping by Prometheus -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+
+    <!-- NEW: OpenAPI / Swagger UI for Spring Boot 3 (springdoc v2.x for compatibility) -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.1.0</version>
+    </dependency>
+
+    <!-- NEW: JSON log encoder (Logstash Logback Encoder) for structured logs -->
+    <dependency>
+      <groupId>net.logstash.logback</groupId>
+      <artifactId>logstash-logback-encoder</artifactId>
+      <version>7.4</version>
+    </dependency>
+
+    <!-- (Optional) If you later want to add Micrometer Tracing / OpenTelemetry bridging,
+         we can add the relevant tracing dependencies — keeping minimal for now. -->
   </dependencies>
 
   <build>
