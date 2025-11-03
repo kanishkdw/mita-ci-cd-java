@@ -22,46 +22,44 @@
   </properties>
 
   <dependencies>
-    <!-- existing dependencies (kept as-is) -->
+    <!-- Base Spring Boot Web -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <!-- NEW: Spring Boot Actuator (exposes /actuator endpoints incl. prometheus when configured) -->
+    <!-- For /actuator metrics and health endpoints -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- NEW: Micrometer Prometheus registry for metrics scraping by Prometheus -->
+    <!-- Micrometer Prometheus for metrics integration -->
     <dependency>
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
 
-    <!-- NEW: OpenAPI / Swagger UI for Spring Boot 3 (springdoc v2.x for compatibility) -->
+    <!-- Swagger / OpenAPI UI -->
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>2.1.0</version>
     </dependency>
 
-    <!-- NEW: JSON log encoder (Logstash Logback Encoder) for structured logs -->
+    <!-- Logstash encoder for structured JSON logs (used by Loki) -->
     <dependency>
       <groupId>net.logstash.logback</groupId>
       <artifactId>logstash-logback-encoder</artifactId>
       <version>7.4</version>
     </dependency>
 
-    <!-- (Optional) If you later want to add Micrometer Tracing / OpenTelemetry bridging,
-         we can add the relevant tracing dependencies — keeping minimal for now. -->
+    <!-- Testing -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
