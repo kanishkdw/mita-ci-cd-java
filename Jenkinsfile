@@ -1,11 +1,8 @@
-// Jenkinsfile - manual SSH clone + flexible build (corrected)
+// Jenkinsfile - cleaned version (HTTPS clone + flexible build)
 pipeline {
   agent any
 
   environment {
-    REPO_SSH        = 'git@github.com:kanishkdw/mita-ci-cd-java.git'
-    SSH_KEY_PATH    = '/var/jenkins_home/.ssh/id_ed25519'
-    KNOWN_HOSTS     = '/var/jenkins_home/.ssh/known_hosts'
     CLONE_DIR       = 'repo'
     SONAR_HOST_URL  = 'http://sonarqube:9000'
     DOCKER_REGISTRY = 'docker.io'
@@ -25,32 +22,13 @@ pipeline {
       }
     }
 
-    stage('Manual SSH clone') {
+    // ✅ Replaced SSH clone with HTTPS + Jenkins credential
+    stage('Clone Repository') {
       steps {
-        script {
-          sh '''
-            echo "Checking SSH key and known_hosts"
-            ls -l "${SSH_KEY_PATH}" || true
-            ls -l "${KNOWN_HOSTS}" || true
-          '''
-          sh '''
-            set -e
-            REPO="${REPO_SSH}"
-            TARGET_DIR="${CLONE_DIR}"
-            rm -rf "${TARGET_DIR}"
-            mkdir -p "${TARGET_DIR}"
-            echo "Cloning ${REPO} into ${TARGET_DIR} ..."
-            GIT_SSH_COMMAND="ssh -i ${SSH_KEY_PATH} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${KNOWN_HOSTS} -v" \
-              git clone --depth=1 "${REPO}" "${TARGET_DIR}" 2>&1 | sed -n '1,200p' || true
-            if [ -d "${TARGET_DIR}/.git" ]; then
-              echo "Clone appears successful. HEAD:"
-              git --git-dir="${TARGET_DIR}/.git" rev-parse --verify HEAD || true
-            else
-              echo "Clone failed - repository directory not found."
-              exit 1
-            fi
-          '''
-        }
+        echo "Cloning repository via HTTPS using Jenkins credentials..."
+        git branch: 'main',
+            credentialsId: 'github-token',
+            url: 'https://github.com/kanishkdw/mita-ci-cd-java.git'
       }
     }
 
@@ -59,15 +37,14 @@ pipeline {
         script {
           sh '''
             set -e
-            cd "${CLONE_DIR}"
             echo "Files in top of repo:"
             ls -la | sed -n '1,200p'
             if [ -f pom.xml ]; then
-              echo "PROJECT_TYPE=maven" > ../project_type.env
+              echo "PROJECT_TYPE=maven" > project_type.env
             elif [ -f package.json ]; then
-              echo "PROJECT_TYPE=node" > ../project_type.env
+              echo "PROJECT_TYPE=node" > project_type.env
             else
-              echo "PROJECT_TYPE=unknown" > ../project_type.env
+              echo "PROJECT_TYPE=unknown" > project_type.env
             fi
           '''
           def props = readFile('project_type.env').trim()
@@ -83,7 +60,6 @@ pipeline {
           if (env.PROJECT_TYPE == 'maven') {
             echo "Running Maven build"
             sh '''
-              cd "${CLONE_DIR}"
               if command -v mvn >/dev/null 2>&1; then
                 mvn -B -DskipTests clean package
               else
@@ -94,7 +70,6 @@ pipeline {
           } else if (env.PROJECT_TYPE == 'node') {
             echo "Running Node build"
             sh '''
-              cd "${CLONE_DIR}"
               if command -v npm >/dev/null 2>&1; then
                 npm ci || npm install
                 if grep -q "\"build\"" package.json; then
@@ -111,7 +86,6 @@ pipeline {
           } else {
             echo "Unknown project type; no build step executed"
             sh '''
-              cd "${CLONE_DIR}"
               echo "You can implement custom build steps here."
               ls -la
             '''
@@ -127,7 +101,6 @@ pipeline {
       steps {
         script {
           sh '''
-            cd "${CLONE_DIR}"
             if command -v mvn >/dev/null 2>&1; then
               mvn -B test || true
             else
@@ -138,7 +111,7 @@ pipeline {
       }
       post {
         always {
-          junit "${CLONE_DIR}/target/surefire-reports/*.xml"
+          junit 'target/surefire-reports/*.xml'
         }
       }
     }
@@ -147,12 +120,12 @@ pipeline {
       steps {
         script {
           if (env.PROJECT_TYPE == 'maven') {
-            sh 'ls -la ${CLONE_DIR}/target || true'
-            archiveArtifacts artifacts: "${CLONE_DIR}/target/**/*.jar", allowEmptyArchive: true
+            sh 'ls -la target || true'
+            archiveArtifacts artifacts: 'target/**/*.jar', allowEmptyArchive: true
           }
           if (env.PROJECT_TYPE == 'node') {
-            archiveArtifacts artifacts: "${CLONE_DIR}/dist/**", allowEmptyArchive: true
-            archiveArtifacts artifacts: "${CLONE_DIR}/build/**", allowEmptyArchive: true
+            archiveArtifacts artifacts: 'dist/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'build/**', allowEmptyArchive: true
           }
         }
       }
@@ -166,7 +139,6 @@ pipeline {
         // use withCredentials to keep token out of Groovy logs
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
           sh '''
-            cd "${CLONE_DIR}"
             if ! command -v mvn >/dev/null 2>&1; then
               echo "Maven not found - cannot run Sonar analysis"
               exit 1
@@ -187,7 +159,7 @@ pipeline {
       steps {
         echo "Deploying MITA App..."
         sh '''
-          cd "${CLONE_DIR}/target"
+          cd target
           JAR_FILE=$(ls *.jar | head -n 1 || true)
           if [ -z "$JAR_FILE" ]; then
             echo "No jar found to deploy"
@@ -200,6 +172,7 @@ pipeline {
         '''
       }
     }
+
     // add more stages here (docker build/push, integration tests, deploy to k8s, etc.)
   } // end stages
 
